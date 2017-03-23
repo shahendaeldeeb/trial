@@ -1,0 +1,211 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+<head>
+    <!-- to make search result clickable -->
+    <!-- table body name is called "search-result"-->
+    <style>
+    <!-- -->
+    .table tr:hover,
+    #view-results tr:hover ,
+    .Header-row th:hover{
+
+     background-color:#f7f7f7;
+          font-size: 13px;
+        cursor: pointer;
+     }
+    <!--we use "tr" to access each row in the table body -->
+    <!--we use "hover" to apply this style on mouse-over  -->
+
+    .delete-btn{
+    color:white;
+    background-color:#d9534f;
+    border-color:d43f3a;
+    border-radius:8px;
+        }
+    .user-info{
+    text-align:right;
+
+    }
+
+    </style>
+</head>
+<body>
+
+<div id="user-info " class="user-info">
+    you are currently logged in as <b> {{.User}} </b>
+    <a href="/logout"> (logout) </a>
+</div>
+
+<div id ="page-switcher" width="100%" text-align="center">
+    <button font-size="24px" font-weight="bold" margine="1em" padding=".3em" onclick="showViewPage()"> View Library</button>
+    <button font-size="24px" font-weight="bold" margine="1em" padding=".3em" onclick="showSearchPage()"> Add Books </button>
+
+</div>
+
+<div id="search-page"  style="display:none">
+<form id ="search-form" onsubmit="return false">
+    <input name="search"/>
+    <input type="submit" value="search" onclick="SubmitSearch()"/>
+
+</form>
+<table class="table">
+    <thead>
+    <tr style="text-align : left ;">
+        <th width="40%">Title</th>
+        <th width="30%">Author</th>
+        <th width="10%">Year</th>
+        <th width="20%">ID</th>
+    </tr>
+    </thead>
+    <tbody id = "search-result"></tbody>
+</table>
+</div>
+<!-- style="display:none"-->
+<div id="view-page" >
+
+    <form id="filter-view-results" style="float: right ;">
+        <select name="filter" style="font-size:18px; min-width:10em;" onchange=" filterViewResults()">
+            <option value="all"> All Books </option>
+            <option value="fiction"> Fiction </option>
+            <option value="nonfiction"> Nonfiction </option>
+        </select>
+    </form>
+    <table width="100%">
+        <thead>
+        <tr style="text-align: left;" class="Header-row">
+            <th width="45%" onclick="sortBooks('title')" > Title </th>
+            <th width="35%" onclick="sortBooks('author')"> Author </th>
+            <th width="15%" onclick="sortBooks('classification')"> classification </th>
+            <th width="5%"></th>
+        </tr>
+        </thead>
+        <tbody id="view-results">
+            {{range .Books}}
+            <!-- id to identify the row to be deleted -->
+            <tr id="book-row-{{.PK}}">
+                <!-- to insert the value of title -->
+                <td> {{.Title}}</td>
+                <td> {{.Author}}</td>
+                <td> {{.Classification}}</td>
+                <td>
+                    <button class="delete-btn" onclick="deleteBook({{.PK}})"> Delete </button>
+                </td>
+            </tr>
+
+            {{end}}
+        </tbody>
+
+    </table>
+</div >
+
+<script type="text/javascript" src="http://code.jquery.com/jquery-2.1.4.min.js" ></script>
+<script type="text/javascript">
+
+
+    $(document).ready(function(){
+    $("#filter-view-results option[value= '"+{{.Filter}}+"']").prop("selected" , true);
+    })
+
+    function filterViewResults(){
+    $.ajax({
+    url: "/books" ,
+    type: "GET",
+    data: $("#filter-view-results").serialize() ,
+    success: rebuildBookCollection,
+    })
+    }
+
+    function appendBook(book){
+     $("#view-results").append("<tr id='book-row-"+book.pk+"'><td> "+book.Title + "</td> <td>"+ book.Author +"</td> <td>"+
+                            book.Classification +"</td><td><button class='delete-btn' onclick='deleteBook("+book.pk+
+                            ")'>Delete</button></td></tr>")
+    }
+
+    function sortBooks(columnName){
+    $.ajax({
+    url:"/books?sortBy=" + columnName ,
+    type:"GET" ,
+    success: rebuildBookCollection,
+    })
+    }
+
+
+    function rebuildBookCollection(result){
+    var books = JSON.parse(result);
+        if ( !books ) return;
+
+        $("#view-results").empty();
+        books.forEach(function(book)
+        {
+            appendBook(book);
+        });
+
+    }
+
+    function deleteBook(pk){
+    $.ajax({
+    type:"DELETE" ,
+    url:"/books/" + pk ,
+    success: function(){
+    x
+    $("#book-row-" +pk).remove();
+    }
+
+    })
+    }
+    function showSearchPage(){
+    $("#search-page").show();
+    $("#view-page").hide();
+    }
+
+    function showViewPage(){
+    $("#search-page").hide();
+    $("#view-page").show();
+    }
+
+    function SubmitSearch()
+    {
+    $.ajax({
+        url: "/search" ,
+        type: "POST",
+        data: $("#search-form").serialize(), <!--serialize function used to encode form elements  -->
+            <!--is the function to be run when the request succeeds -->
+        success: function (dataFromServer){
+             <!-- json.parse() convert data from string to json object -->
+               var parsed = JSON.parse(dataFromServer);
+                if (!parsed ) return;
+
+                var SearchResult = $('#search-result');
+                SearchResult.empty();
+
+                parsed.forEach(function(result){
+                var row = $("<tr><td> "+result.Title + "</td> <td>"+ result.Author +"</td> <td>"+result.Year +"</td> <td>"+result.ID+"</td></tr>");
+                SearchResult.append(row);
+                           <!-- to add a click event to each row  -->
+                row.on("click",function(){
+                            $.ajax({
+                                <!--here we use query string to send parameter to the url  -->
+                            url: "/Books?id="+result.ID,
+                            type: "PUT" ,
+                            success: function(data){
+
+                            var book = JSON.parse(data);
+                            if (!book ) return;
+                            appendBook(book);
+                            }
+
+
+
+                            })
+                      })
+                 });
+
+             }
+        });
+
+    return false;
+    }
+
+</script>
+</body>
+</html>
